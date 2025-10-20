@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* BrickByByte Light Theme - Inspired by Lusion */
+    --background: 0 0% 98%; /* Very light grey background */
+    --foreground: 0 0% 10%; /* Near black text */
+
+    --card: 0 0% 100%; /* White cards */
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 228 92% 39%; /* #0A21C0 Cobalt Blue */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 95%; /* Light grey */
+    --secondary-foreground: 0 0% 10%;
+
+    --muted: 0 0% 94%; /* Subtle grey */
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 180 100% 50%; /* Cyan accent inspired by lusion */
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 0 0% 88%; /* Light border */
+    --input: 0 0% 88%;
+    --ring: 228 92% 39%;
+
+    --radius: 0.75rem;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(228 92% 39%) 0%, hsl(228 92% 50%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 98%) 0%, hsl(0 0% 96%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(180 100% 50%) 0%, hsl(228 92% 50%) 100%);
+
+    /* Shadows */
+    --shadow-glow: 0 0 30px hsla(228 92% 39% / 0.15);
+    --shadow-card: 0 10px 40px hsla(0 0% 0% / 0.08);
+    --shadow-subtle: 0 4px 20px hsla(0 0% 0% / 0.05);
+
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+  
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+  
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-subtle {
+    box-shadow: var(--shadow-subtle);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
