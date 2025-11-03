@@ -7,11 +7,9 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 import joblib
 from feature_engineering import add_features
 
-# ---------------- Paths (fallback to attached file if present) ---------------- #
+# ---------------- Paths ---------------- #
 script_dir = os.path.dirname(os.path.abspath(__file__))
-default_data_path = os.path.join(script_dir, "../data/augmented_housing.csv")
-attached_path = "/mnt/data/augmented_housing.csv"
-data_path = attached_path if os.path.exists(attached_path) else default_data_path
+data_path = os.path.join(script_dir, "../data/augmented_housing.csv")
 models_dir = os.path.join(script_dir, "../models")
 os.makedirs(models_dir, exist_ok=True)
 
@@ -27,9 +25,9 @@ if "total_bedrooms" in data.columns:
 print("Applying feature engineering...")
 data = add_features(data)
 
-# Minimal OHE without global fit
+# One-hot encode ocean_proximity
 if "ocean_proximity" in data.columns and data["ocean_proximity"].dtype == "object":
-    data = pd.get_dummies(data, columns=["ocean_proximity"], drop_first=True)
+    data = pd.get_dummies(data, columns=["ocean_proximity"], drop_first=False)
 
 # Targets
 classification_tasks = {
@@ -37,13 +35,12 @@ classification_tasks = {
     "sell_speed": "sell_speed",
 }
 
-# Known leaky columns (never train on these)
+# Known leaky columns
 BASE_DROP = {"monthly_rent","roi","neighborhood_investment","sell_speed","median_house_value"}
-# Common culprits you may want to exclude as well if present
 POSSIBLE_LEAKY = {"days_on_market","price_bin","roi_bin"}
 
 def leakage_sentinel_drop(X, y, task_name):
-    """Drop any single column that perfectly determines y (keeps things simple)."""
+    """Drop any single column that perfectly determines y"""
     dropped = []
     ys = y.astype(str)
     for col in X.columns:
@@ -63,13 +60,13 @@ for model_name, target_col in classification_tasks.items():
     y = data[target_col]
     X = data.drop(columns=[c for c in BASE_DROP if c in data.columns])
 
-    # Optional: drop suspicious columns if they exist
+    # Drop suspicious columns if they exist
     susp = [c for c in POSSIBLE_LEAKY if c in X.columns]
     if susp:
         warnings.warn(f"[{model_name}] Dropping suspicious possibly-leaky columns: {susp}")
         X = X.drop(columns=susp)
 
-    # Deduplicate (X,y) rows to avoid exact copies in both splits
+    # Deduplicate (X,y) rows
     before = len(X)
     dedup = pd.concat([X, y], axis=1).drop_duplicates()
     X, y = dedup.drop(columns=[target_col]), dedup[target_col]
@@ -88,21 +85,21 @@ for model_name, target_col in classification_tasks.items():
         X, y, test_size=0.20, stratify=y, random_state=RANDOM_STATE
     )
 
-    # >>> Stronger RF regularization to avoid overfitting <<<
+    # Regularized RandomForest
     clf = RandomForestClassifier(
-        n_estimators=120,        # enough trees, not huge
-        max_depth=5,            # shallower trees
-        min_samples_leaf=25,    # bigger leaves
-        min_samples_split=50,   # require more samples to split
-        max_features=0.3,       # feature bagging (30% per split)
-        min_impurity_decrease=1e-4,  # ignore tiny splits
+        n_estimators=120,
+        max_depth=5,
+        min_samples_leaf=25,
+        min_samples_split=50,
+        max_features=0.3,
+        min_impurity_decrease=1e-4,
         bootstrap=True,
-        oob_score=True,         # quick generalization check
+        oob_score=True,
         random_state=RANDOM_STATE,
         n_jobs=-1
     )
 
-    # CV on train only (simple accuracy)
+    # CV on train only
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
     cv_scores = cross_val_score(clf, X_train, y_train, cv=skf, scoring="accuracy", n_jobs=-1)
     print(f"{model_name.capitalize()} CV Acc: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
@@ -111,18 +108,20 @@ for model_name, target_col in classification_tasks.items():
     clf.fit(X_train, y_train)
     if hasattr(clf, "oob_score_"):
         print(f"{model_name.capitalize()} OOB Score: {clf.oob_score_:.4f}")
+    
     y_pred = clf.predict(X_test)
-
     acc = accuracy_score(y_test, y_pred)
     bal = balanced_accuracy_score(y_test, y_pred)
+    
     print(f"{model_name.capitalize()} Test Accuracy: {acc:.4f} | Balanced Acc: {bal:.4f}")
     print(f"{model_name.capitalize()} Classification Report:")
     print(classification_report(y_test, y_pred))
     print(f"{model_name.capitalize()} Confusion Matrix:")
     print(confusion_matrix(y_test, y_pred))
 
-    # Save model + feature list
+    # Save model + feature list (NO SCALER for classifiers)
     joblib.dump(clf, os.path.join(models_dir, f"{model_name}_classifier.pkl"))
     joblib.dump(X.columns.tolist(), os.path.join(models_dir, f"{model_name}_feature_columns.pkl"))
+    print(f"Saved {model_name}_classifier.pkl and {model_name}_feature_columns.pkl")
 
-print("\n✅ Trained RandomForest with stronger regularization and minimal leakage guard.")
+print("\n✅ Trained RandomForest classifiers (without scalers)")
