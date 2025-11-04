@@ -1,18 +1,38 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, TrendingUp, Loader2 } from "lucide-react";
-import { getFeatureImportance, type FeatureImportance } from "@/services/api";
+import { getFeatureImportance, getModelPerformance, type FeatureImportance } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const Insights = () => {
+  const { toast } = useToast();
   const [modelType, setModelType] = useState<"price" | "rent" | "roi">("price");
   const [features, setFeatures] = useState<FeatureImportance[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modelPerf, setModelPerf] = useState({
+    average_accuracy: 0,
+    price_r2: 0,
+    rent_r2: 0,
+    roi_r2: 0,
+  });
+
+  useEffect(() => {
+    loadModelPerformance();
+  }, []);
 
   useEffect(() => {
     loadFeatureImportance();
   }, [modelType]);
+
+  const loadModelPerformance = async () => {
+    try {
+      const data = await getModelPerformance();
+      setModelPerf(data);
+    } catch (error) {
+      console.error("Failed to load model performance:", error);
+    }
+  };
 
   const loadFeatureImportance = async () => {
     setLoading(true);
@@ -21,21 +41,32 @@ const Insights = () => {
       setFeatures(data.sort((a, b) => b.importance - a.importance));
     } catch (error) {
       console.error("Failed to load feature importance:", error);
-      // Use mock data for demonstration
-      setFeatures([
-        { feature: "median_income", importance: 0.42 },
-        { feature: "ocean_proximity", importance: 0.18 },
-        { feature: "total_rooms", importance: 0.15 },
-        { feature: "latitude", importance: 0.12 },
-        { feature: "housing_median_age", importance: 0.08 },
-        { feature: "population", importance: 0.05 },
-      ]);
+      toast({
+        title: "Failed to Load Feature Importance",
+        description: "Please check your backend connection.",
+        variant: "destructive",
+      });
+      // Fallback to empty
+      setFeatures([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const maxImportance = Math.max(...features.map((f) => f.importance));
+  const maxImportance = Math.max(...features.map((f) => f.importance), 0.01);
+
+  const getCurrentModelScore = () => {
+    switch (modelType) {
+      case "price":
+        return (modelPerf.price_r2 * 100).toFixed(1);
+      case "rent":
+        return (modelPerf.rent_r2 * 100).toFixed(1);
+      case "roi":
+        return (modelPerf.roi_r2 * 100).toFixed(1);
+      default:
+        return "0";
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -66,6 +97,10 @@ const Insights = () => {
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : features.length === 0 ? (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              No feature importance data available
             </div>
           ) : (
             <div className="space-y-4">
@@ -105,10 +140,14 @@ const Insights = () => {
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="font-bold mb-2">Model Accuracy</h3>
-                <p className="text-3xl font-bold text-primary mb-2">94.2%</p>
+                <h3 className="font-bold mb-2">
+                  {modelType.charAt(0).toUpperCase() + modelType.slice(1)} Model R²
+                </h3>
+                <p className="text-3xl font-bold text-primary mb-2">
+                  {getCurrentModelScore()}%
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  Average prediction accuracy across all models
+                  Current model performance
                 </p>
               </div>
             </div>
@@ -128,10 +167,10 @@ const Insights = () => {
           <Card className="p-6 gradient-card border border-border">
             <h3 className="font-bold mb-4">Key Findings</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>• Median income is the strongest predictor</li>
+              <li>• {features[0]?.feature.replace(/_/g, " ") || "Top feature"} is the strongest predictor</li>
               <li>• Ocean proximity significantly affects value</li>
-              <li>• Location coordinates matter more than property size</li>
-              <li>• Renovation budget shows clear ROI correlation</li>
+              <li>• Location coordinates matter for accuracy</li>
+              <li>• Income and demographics drive predictions</li>
             </ul>
           </Card>
         </div>
@@ -161,11 +200,11 @@ const Insights = () => {
 
         <Card className="p-6 gradient-card border border-accent/30">
           <h3 className="text-lg font-bold mb-2 text-accent">
-            Renovation ROI
+            Model Accuracy
           </h3>
           <p className="text-sm text-muted-foreground">
-            Strategic renovations in high-income areas yield 18-25% returns
-            within 12-18 months.
+            Our XGBoost models achieve {(modelPerf.average_accuracy * 100).toFixed(1)}% average R²
+            score across all prediction tasks.
           </p>
         </Card>
       </div>
