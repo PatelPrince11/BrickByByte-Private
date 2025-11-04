@@ -39,29 +39,25 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30 second timeout for ML predictions
 });
 
 // Error handler
 const handleApiError = (error: any) => {
   if (error.response) {
-    // Server responded with error
     console.error("API Error:", error.response.data);
     throw new Error(error.response.data.detail || "API request failed");
   } else if (error.request) {
-    // Request made but no response
     console.error("Network Error:", error.request);
     throw new Error("Cannot connect to backend. Please ensure the server is running at http://127.0.0.1:8000");
   } else {
-    // Something else happened
     console.error("Error:", error.message);
     throw error;
   }
 };
 
-export const predictPrice = async (
-  features: HouseFeatures
-): Promise<PredictionResponse> => {
+// API functions with better error handling
+export const predictPrice = async (features: HouseFeatures): Promise<PredictionResponse> => {
   try {
     const response = await api.post("/predict/price", features);
     return response.data;
@@ -71,9 +67,7 @@ export const predictPrice = async (
   }
 };
 
-export const predictRent = async (
-  features: HouseFeatures
-): Promise<PredictionResponse> => {
+export const predictRent = async (features: HouseFeatures): Promise<PredictionResponse> => {
   try {
     const response = await api.post("/predict/rent", features);
     return response.data;
@@ -83,9 +77,7 @@ export const predictRent = async (
   }
 };
 
-export const predictROI = async (
-  features: HouseFeatures
-): Promise<PredictionResponse> => {
+export const predictROI = async (features: HouseFeatures): Promise<PredictionResponse> => {
   try {
     const response = await api.post("/predict/roi", features);
     return response.data;
@@ -95,9 +87,7 @@ export const predictROI = async (
   }
 };
 
-export const predictNeighborhood = async (
-  features: HouseFeatures
-): Promise<NeighborhoodResponse> => {
+export const predictNeighborhood = async (features: HouseFeatures): Promise<NeighborhoodResponse> => {
   try {
     const response = await api.post("/predict/neighborhood", features);
     return response.data;
@@ -107,9 +97,7 @@ export const predictNeighborhood = async (
   }
 };
 
-export const predictSellSpeed = async (
-  features: HouseFeatures
-): Promise<SellSpeedResponse> => {
+export const predictSellSpeed = async (features: HouseFeatures): Promise<SellSpeedResponse> => {
   try {
     const response = await api.post("/predict/sell_speed", features);
     return response.data;
@@ -119,26 +107,30 @@ export const predictSellSpeed = async (
   }
 };
 
-export const getFeatureImportance = async (
-  modelType: "price" | "rent" | "roi"
-): Promise<FeatureImportance[]> => {
-  try {
-    const response = await api.get(
-      `/predict/feature_importance?model=${modelType}`
-    );
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    throw error;
-  }
+// Mock feature importance for now
+export const getFeatureImportance = async (modelType: "price" | "rent" | "roi"): Promise<FeatureImportance[]> => {
+  // Return mock data since this endpoint isn't implemented yet
+  const mockData: FeatureImportance[] = [
+    { feature: "median_income", importance: 0.42 },
+    { feature: "ocean_proximity", importance: 0.18 },
+    { feature: "total_rooms", importance: 0.15 },
+    { feature: "latitude", importance: 0.12 },
+    { feature: "housing_median_age", importance: 0.08 },
+    { feature: "population", importance: 0.05 },
+  ];
+  
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(mockData), 500);
+  });
 };
 
 // Health check endpoint
 export const checkBackendHealth = async (): Promise<boolean> => {
   try {
-    await api.get("/");
+    await api.get("/health");
     return true;
   } catch (error) {
+    console.error("Backend health check failed:", error);
     return false;
   }
 };

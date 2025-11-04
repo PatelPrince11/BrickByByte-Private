@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
   predictROI,
   predictNeighborhood,
   predictSellSpeed,
+  checkBackendHealth,
 } from "@/services/api";
 
 const Predict = () => {
@@ -35,6 +36,20 @@ const Predict = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      const isHealthy = await checkBackendHealth();
+      if (!isHealthy) {
+        toast({
+          title: "Backend Not Connected",
+          description: "Please ensure the backend server is running on http://127.0.0.1:8000",
+          variant: "destructive",
+        });
+      }
+    };
+    checkHealth();
+  }, [toast]); // Add toast to dependency array
 
   const oceanProximity = watch("ocean_proximity");
 

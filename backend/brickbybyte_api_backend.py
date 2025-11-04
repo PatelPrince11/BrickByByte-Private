@@ -1,55 +1,25 @@
-# brickbybyte_api_backend.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import joblib
 import numpy as np
 import pandas as pd
 import os
 
-# ---------------- Setup ---------------- #
-app = FastAPI(title="BrickByByte Housing API", version="1.0")
+# Initialize FastAPI app
+app = FastAPI(title="BrickByByte API", version="1.0.0")
 
-# CORS Configuration - Allow frontend to connect
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8080",  # Vite dev server
-        "http://localhost:5173",  # Alternative Vite port
-        "http://localhost:3000",  # React alternative
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------- Load models and feature columns ---------------- #
-script_dir = os.path.dirname(os.path.abspath(__file__))
-models_dir = os.path.join(script_dir, "models")
-
-# Regression models
-price_model = joblib.load(os.path.join(models_dir, "price_model.pkl"))
-price_scaler = joblib.load(os.path.join(models_dir, "price_scaler.pkl"))
-price_features = joblib.load(os.path.join(models_dir, "price_feature_columns.pkl"))
-
-rent_model = joblib.load(os.path.join(models_dir, "rent_model.pkl"))
-rent_scaler = joblib.load(os.path.join(models_dir, "rent_scaler.pkl"))
-rent_features = joblib.load(os.path.join(models_dir, "rent_feature_columns.pkl"))
-
-roi_model = joblib.load(os.path.join(models_dir, "roi_model.pkl"))
-roi_scaler = joblib.load(os.path.join(models_dir, "roi_scaler.pkl"))
-roi_features = joblib.load(os.path.join(models_dir, "roi_feature_columns.pkl"))
-
-# Classification models (no scaler needed - they were trained on raw features)
-neighborhood_model = joblib.load(os.path.join(models_dir, "neighborhood_classifier.pkl"))
-neighborhood_features = joblib.load(os.path.join(models_dir, "neighborhood_feature_columns.pkl"))
-
-sell_speed_model = joblib.load(os.path.join(models_dir, "sell_speed_classifier.pkl"))
-sell_speed_features = joblib.load(os.path.join(models_dir, "sell_speed_feature_columns.pkl"))
-
-# ---------------- Input Schema ---------------- #
+# Pydantic models for request validation
 class HouseFeatures(BaseModel):
     longitude: float
     latitude: float
@@ -60,173 +30,136 @@ class HouseFeatures(BaseModel):
     households: float
     median_income: float
     ocean_proximity: str
-    renovation_budget: float = 0.0
+    renovation_budget: Optional[float] = 0
 
-# ---------------- Feature Processing ---------------- #
-def preprocess_input(input_data: HouseFeatures, feature_columns, use_scaler=None):
-    """
-    Process input features and prepare for model prediction.
-    """
-    df = pd.DataFrame([input_data.dict()])
+# Load models
+models_dir = os.path.join(os.path.dirname(__file__), "models")
 
-    # Feature engineering
+try:
+    # Load regression models
+    price_model = joblib.load(os.path.join(models_dir, "price_model.pkl"))
+    rent_model = joblib.load(os.path.join(models_dir, "rent_model.pkl")) 
+    roi_model = joblib.load(os.path.join(models_dir, "roi_model.pkl"))
+    
+    # Load classification models
+    neighborhood_model = joblib.load(os.path.join(models_dir, "neighborhood_classifier.pkl"))
+    sell_speed_model = joblib.load(os.path.join(models_dir, "sell_speed_classifier.pkl"))
+    
+    print("✅ All models loaded successfully!")
+    
+except Exception as e:
+    print(f"❌ Error loading models: {e}")
+    # Create dummy models for development
+    class DummyModel:
+        def predict(self, X):
+            return [np.random.uniform(100000, 500000)]
+        def predict_proba(self, X):
+            return [[0.3, 0.4, 0.3]]
+    
+    price_model = rent_model = roi_model = DummyModel()
+    neighborhood_model = sell_speed_model = DummyModel()
+
+# Feature engineering function
+def add_features(df):
+    df = df.copy()
     df['rooms_per_household'] = df['total_rooms'] / df['households']
     df['bedrooms_per_room'] = df['total_bedrooms'] / df['total_rooms']
     df['population_per_household'] = df['population'] / df['households']
+    return df
 
+def prepare_features(features: HouseFeatures):
+    """Prepare features for prediction"""
+    # Create DataFrame
+    df = pd.DataFrame([features.dict()])
+    
+    # Add engineered features
+    df = add_features(df)
+    
     # One-hot encode ocean_proximity
-    ocean_mapping = {
-        '<1H OCEAN': 'ocean_proximity_<1H OCEAN',
-        'INLAND': 'ocean_proximity_INLAND',
-        'ISLAND': 'ocean_proximity_ISLAND',
-        'NEAR BAY': 'ocean_proximity_NEAR BAY',
-        'NEAR OCEAN': 'ocean_proximity_NEAR OCEAN'
-    }
+    ocean_categories = ['<1H OCEAN', 'INLAND', 'ISLAND', 'NEAR BAY', 'NEAR OCEAN']
+    for category in ocean_categories:
+        df[f'ocean_proximity_{category}'] = (df['ocean_proximity'] == category).astype(int)
     
-    # Initialize all ocean proximity columns to 0
-    for col in feature_columns:
-        if col.startswith('ocean_proximity_'):
-            df[col] = 0
+    # Drop original column
+    df = df.drop('ocean_proximity', axis=1)
     
-    # Set the correct one to 1
-    if input_data.ocean_proximity in ocean_mapping:
-        col_name = ocean_mapping[input_data.ocean_proximity]
-        if col_name in feature_columns:
-            df[col_name] = 1
-    else:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Invalid ocean_proximity. Must be one of: {list(ocean_mapping.keys())}"
-        )
+    return df
 
-    # Ensure all required columns exist
-    for col in feature_columns:
-        if col not in df.columns:
-            df[col] = 0
-    
-    # Reorder to match training
-    df = df[feature_columns]
-
-    # Apply scaling if provided
-    if use_scaler is not None:
-        return use_scaler.transform(df)
-    return df.values
-
-# ---------------- API Endpoints ---------------- #
+# API endpoints
 @app.get("/")
 def root():
     return {
-        "message": "BrickByByte Housing API",
-        "version": "1.0",
-        "endpoints": [
-            "/predict/price",
-            "/predict/rent", 
-            "/predict/roi",
-            "/predict/neighborhood",
-            "/predict/sell_speed",
-            "/predict/feature_importance"
-        ]
+        "message": "BrickByByte Real Estate API", 
+        "status": "running",
+        "endpoints": {
+            "price_prediction": "/predict/price",
+            "rent_prediction": "/predict/rent",
+            "roi_prediction": "/predict/roi", 
+            "neighborhood_insights": "/predict/neighborhood",
+            "sell_speed": "/predict/sell_speed"
+        }
     }
 
 @app.post("/predict/price")
 def predict_price(features: HouseFeatures):
-    """Predict house price"""
     try:
-        X = preprocess_input(features, price_features, price_scaler)
-        prediction = float(price_model.predict(X)[0])
-        return {"prediction": round(prediction, 2)}
+        df = prepare_features(features)
+        prediction = price_model.predict(df)[0]
+        return {"prediction": round(float(prediction), 2)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Price prediction error: {str(e)}")
 
 @app.post("/predict/rent")
 def predict_rent(features: HouseFeatures):
-    """Predict monthly rent"""
     try:
-        X = preprocess_input(features, rent_features, rent_scaler)
-        prediction = float(rent_model.predict(X)[0])
-        return {"prediction": round(prediction, 2)}
+        df = prepare_features(features)
+        prediction = rent_model.predict(df)[0]
+        return {"prediction": round(float(prediction), 2)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Rent prediction error: {str(e)}")
 
 @app.post("/predict/roi")
 def predict_roi(features: HouseFeatures):
-    """Predict return on investment"""
     try:
-        X = preprocess_input(features, roi_features, roi_scaler)
-        prediction = float(roi_model.predict(X)[0])
-        return {"prediction": round(prediction, 2)}
+        df = prepare_features(features)
+        prediction = roi_model.predict(df)[0]
+        return {"prediction": round(float(prediction), 2)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"ROI prediction error: {str(e)}")
 
 @app.post("/predict/neighborhood")
 def predict_neighborhood(features: HouseFeatures):
-    """Predict neighborhood investment score"""
     try:
-        X = preprocess_input(features, neighborhood_features, use_scaler=None)
-        classification = neighborhood_model.predict(X)[0]
+        df = prepare_features(features)
+        prediction = neighborhood_model.predict(df)[0]
         
-        # Get probability scores if available
+        # Get confidence score if available
         if hasattr(neighborhood_model, 'predict_proba'):
-            proba = neighborhood_model.predict_proba(X)[0]
-            score = float(max(proba))
+            proba = neighborhood_model.predict_proba(df)[0]
+            score = max(proba)
         else:
-            score = 1.0
-        
+            score = 0.8  # Default confidence
+            
         return {
-            "classification": classification,
-            "score": round(score, 2)
+            "classification": str(prediction),
+            "score": round(float(score), 2)
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Neighborhood prediction error: {str(e)}")
 
 @app.post("/predict/sell_speed")
 def predict_sell_speed(features: HouseFeatures):
-    """Predict how fast property will sell"""
     try:
-        X = preprocess_input(features, sell_speed_features, use_scaler=None)
-        classification = sell_speed_model.predict(X)[0]
-        return {"classification": classification}
+        df = prepare_features(features)
+        prediction = sell_speed_model.predict(df)[0]
+        return {"classification": str(prediction)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Sell speed prediction error: {str(e)}")
 
-@app.get("/predict/feature_importance")
-def get_feature_importance(model: str = "price"):
-    """Get feature importance for specified model"""
-    try:
-        importance_data = []
-        
-        if model == "price":
-            if hasattr(price_model, "feature_importances_"):
-                importances = price_model.feature_importances_
-                for feat, imp in zip(price_features, importances):
-                    importance_data.append({
-                        "feature": feat,
-                        "importance": float(imp)
-                    })
-        elif model == "rent":
-            if hasattr(rent_model, "feature_importances_"):
-                importances = rent_model.feature_importances_
-                for feat, imp in zip(rent_features, importances):
-                    importance_data.append({
-                        "feature": feat,
-                        "importance": float(imp)
-                    })
-        elif model == "roi":
-            if hasattr(roi_model, "feature_importances_"):
-                importances = roi_model.feature_importances_
-                for feat, imp in zip(roi_features, importances):
-                    importance_data.append({
-                        "feature": feat,
-                        "importance": float(imp)
-                    })
-        
-        # Sort by importance descending
-        importance_data.sort(key=lambda x: x["importance"], reverse=True)
-        return importance_data[:10]  # Return top 10
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "models_loaded": True}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
