@@ -1,4 +1,3 @@
-# backend/brickbybyte_api_backend.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -71,6 +70,12 @@ def load_models():
         sell_speed_features = joblib.load(os.path.join(models_dir, "sell_speed_feature_columns.pkl"))
         
         print("✅ All models loaded successfully!")
+        print(f"Price features: {len(price_features)} columns")
+        print(f"Rent features: {len(rent_features)} columns") 
+        print(f"ROI features: {len(roi_features)} columns")
+        print(f"Neighborhood features: {len(neighborhood_features)} columns")
+        print(f"Sell speed features: {len(sell_speed_features)} columns")
+        
         return True
         
     except Exception as e:
@@ -97,7 +102,7 @@ def prepare_features_for_model(features: HouseFeatures, feature_columns, scaler=
     df['bedrooms_per_room'] = df['total_bedrooms'] / df['total_rooms']
     df['population_per_household'] = df['population'] / df['households']
     
-    # One-hot encode ocean_proximity (same as training)
+    # CRITICAL: One-hot encode ocean_proximity (same as training)
     ocean_categories = ['<1H OCEAN', 'INLAND', 'ISLAND', 'NEAR BAY', 'NEAR OCEAN']
     for category in ocean_categories:
         col_name = f'ocean_proximity_{category}'
@@ -105,6 +110,15 @@ def prepare_features_for_model(features: HouseFeatures, feature_columns, scaler=
     
     # Drop original ocean_proximity column
     df = df.drop('ocean_proximity', axis=1)
+    
+    # Debug: Show what columns we have vs what model expects
+    print(f"Input columns after processing: {len(df.columns)}")
+    print(f"Model expects: {len(feature_columns)} columns")
+    
+    # Check for missing columns
+    missing_cols = [col for col in feature_columns if col not in df.columns]
+    if missing_cols:
+        print(f"⚠️  Missing columns: {missing_cols}")
     
     # Ensure all required columns exist and in correct order
     for col in feature_columns:
@@ -114,10 +128,16 @@ def prepare_features_for_model(features: HouseFeatures, feature_columns, scaler=
     # Reorder columns to match training exactly
     df = df[feature_columns]
     
+    # Debug: Show first few columns to verify order
+    print(f"First 10 columns for model: {list(df.columns)[:10]}")
+    
     # Apply scaling if scaler is provided (for regression models)
     if scaler is not None:
-        return scaler.transform(df)
+        X_scaled = scaler.transform(df)
+        print(f"Input shape after scaling: {X_scaled.shape}")
+        return X_scaled
     else:
+        print(f"Input shape: {df.values.shape}")
         return df.values
 
 # Fallback dummy model class
@@ -147,15 +167,17 @@ def root():
 def predict_price(features: HouseFeatures):
     try:
         if not models_loaded or price_model is None:
-            # Fallback response
             return {"prediction": 350000.0}
         
+        print(f"\n=== PRICE PREDICTION ===")
         X = prepare_features_for_model(features, price_features, price_scaler)
         prediction = price_model.predict(X)[0]
+        print(f"Raw prediction: {prediction}")
+        print(f"Final prediction: ${prediction:,.2f}")
         return {"prediction": round(float(prediction), 2)}
     except Exception as e:
         print(f"Price prediction error: {e}")
-        return {"prediction": 350000.0}  # Fallback
+        return {"prediction": 350000.0}
 
 @app.post("/predict/rent")
 def predict_rent(features: HouseFeatures):
@@ -163,8 +185,11 @@ def predict_rent(features: HouseFeatures):
         if not models_loaded or rent_model is None:
             return {"prediction": 2500.0}
         
+        print(f"\n=== RENT PREDICTION ===")
         X = prepare_features_for_model(features, rent_features, rent_scaler)
         prediction = rent_model.predict(X)[0]
+        print(f"Raw prediction: {prediction}")
+        print(f"Final prediction: ${prediction:,.2f}")
         return {"prediction": round(float(prediction), 2)}
     except Exception as e:
         print(f"Rent prediction error: {e}")
@@ -174,14 +199,20 @@ def predict_rent(features: HouseFeatures):
 def predict_roi(features: HouseFeatures):
     try:
         if not models_loaded or roi_model is None:
-            return {"prediction": 15.5}
+            return {"prediction": 12.5}
         
+        print(f"\n=== ROI PREDICTION ===")
         X = prepare_features_for_model(features, roi_features, roi_scaler)
         prediction = roi_model.predict(X)[0]
-        return {"prediction": round(float(prediction), 2)}
+        print(f"Raw prediction: {prediction}")
+        print(f"Final prediction: {prediction:.2f}%")
+        
+        # ROI is already percentage in the model output
+        roi_value = max(2.0, min(25.0, float(prediction)))
+        return {"prediction": round(roi_value, 2)}
     except Exception as e:
         print(f"ROI prediction error: {e}")
-        return {"prediction": 15.5}
+        return {"prediction": 12.5}
 
 @app.post("/predict/neighborhood")
 def predict_neighborhood(features: HouseFeatures):
@@ -189,6 +220,7 @@ def predict_neighborhood(features: HouseFeatures):
         if not models_loaded or neighborhood_model is None:
             return {"classification": "Medium", "score": 0.8}
         
+        print(f"\n=== NEIGHBORHOOD PREDICTION ===")
         X = prepare_features_for_model(features, neighborhood_features)
         prediction = neighborhood_model.predict(X)[0]
         
@@ -198,7 +230,8 @@ def predict_neighborhood(features: HouseFeatures):
             score = max(proba)
         else:
             score = 0.8
-            
+        
+        print(f"Prediction: {prediction}, Score: {score:.2f}")
         return {
             "classification": str(prediction),
             "score": round(float(score), 2)
@@ -213,8 +246,10 @@ def predict_sell_speed(features: HouseFeatures):
         if not models_loaded or sell_speed_model is None:
             return {"classification": "Medium"}
         
+        print(f"\n=== SELL SPEED PREDICTION ===")
         X = prepare_features_for_model(features, sell_speed_features)
         prediction = sell_speed_model.predict(X)[0]
+        print(f"Prediction: {prediction}")
         return {"classification": str(prediction)}
     except Exception as e:
         print(f"Sell speed prediction error: {e}")
