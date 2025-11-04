@@ -25,7 +25,8 @@ data['total_bedrooms'] = data['total_bedrooms'].fillna(data['total_bedrooms'].me
 
 # ---------------- Feature Engineering ---------------- #
 data = add_features(data)
-data = pd.get_dummies(data, columns=['ocean_proximity'])
+# REMOVED: data = pd.get_dummies(data, columns=['ocean_proximity'])
+# The data already has one-hot encoded ocean_proximity columns
 
 # ---------------- Function to Train One Model ---------------- #
 def train_xgb_regression(target_col, model_name):

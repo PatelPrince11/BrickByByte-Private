@@ -1,4 +1,3 @@
-# scripts/train_classifiers.py
 import os, warnings
 import pandas as pd
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
@@ -25,9 +24,14 @@ if "total_bedrooms" in data.columns:
 print("Applying feature engineering...")
 data = add_features(data)
 
+# REMOVE THIS SECTION - Data already has one-hot encoded ocean_proximity
 # One-hot encode ocean_proximity
-if "ocean_proximity" in data.columns and data["ocean_proximity"].dtype == "object":
-    data = pd.get_dummies(data, columns=["ocean_proximity"], drop_first=False)
+# if "ocean_proximity" in data.columns and data["ocean_proximity"].dtype == "object":
+#     data = pd.get_dummies(data, columns=["ocean_proximity"], drop_first=False)
+
+# Check if ocean_proximity columns exist
+ocean_cols = [col for col in data.columns if col.startswith('ocean_proximity_')]
+print(f"Found {len(ocean_cols)} ocean_proximity columns: {ocean_cols}")
 
 # Targets
 classification_tasks = {
@@ -79,6 +83,8 @@ for model_name, target_col in classification_tasks.items():
         print(f"[{model_name}] Leakage sentinel dropped: {dropped_cols}")
 
     print(f"[{model_name}] Class counts:\n{y.value_counts()}\n")
+    print(f"[{model_name}] Features: {len(X.columns)} columns")
+    print(f"[{model_name}] First 10 features: {list(X.columns)[:10]}")
 
     # Train/test split
     X_train, X_test, y_train, y_test = train_test_split(
