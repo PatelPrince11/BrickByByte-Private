@@ -167,10 +167,15 @@ const Insights = () => {
           <Card className="p-6 gradient-card border border-border">
             <h3 className="font-bold mb-4">Key Findings</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>• {features[0]?.feature.replace(/_/g, " ") || "Top feature"} is the strongest predictor</li>
-              <li>• Ocean proximity significantly affects value</li>
-              <li>• Location coordinates matter for accuracy</li>
-              <li>• Income and demographics drive predictions</li>
+              {features.slice(0, 4).map((f) => (
+                <li key={f.feature}>
+                  • <span className="capitalize">{f.feature.replace(/_/g, " ")}</span>{" "}
+                  ({(f.importance * 100).toFixed(1)}%)
+                </li>
+              ))}
+              {features.length === 0 && (
+                <li>• Load a model to see key drivers</li>
+              )}
             </ul>
           </Card>
         </div>
