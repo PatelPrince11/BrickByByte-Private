@@ -1,8 +1,36 @@
+import { useEffect, useState } from "react";
 import { DollarSign, TrendingUp, MapPin, BarChart3, Home } from "lucide-react";
 import MetricCard from "@/components/MetricCard";
 import FeatureCard from "@/components/FeatureCard";
+import { getDashboardStats, type DashboardStats } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const data = await getDashboardStats();
+        setStats(data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats:", error);
+        toast({
+          title: "Failed to Load Statistics",
+          description: "Unable to fetch dashboard data. Check backend connection.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [toast]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -32,23 +60,45 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Avg Property Value"
-            value="$385,000"
-            subtitle="+12% from last quarter"
+            value={
+              loading
+                ? "Loading..."
+                : stats
+                ? `$${Math.round(stats.avg_property_value).toLocaleString()}`
+                : "N/A"
+            }
+            subtitle={
+              stats
+                ? "From dataset analysis"
+                : "Unable to load data"
+            }
             icon={DollarSign}
-            trend="up"
+            trend={stats ? "up" : "neutral"}
             variant="success"
           />
           <MetricCard
             title="Avg ROI Potential"
-            value="18.5%"
+            value={
+              loading
+                ? "Loading..."
+                : stats
+                ? `${stats.avg_roi_potential.toFixed(1)}%`
+                : "N/A"
+            }
             subtitle="For renovation investments"
             icon={TrendingUp}
-            trend="up"
+            trend={stats ? "up" : "neutral"}
             variant="default"
           />
           <MetricCard
             title="High Investment Areas"
-            value="24"
+            value={
+              loading
+                ? "Loading..."
+                : stats
+                ? stats.high_investment_areas.toString()
+                : "N/A"
+            }
             subtitle="Neighborhoods analyzed"
             icon={MapPin}
             trend="neutral"
@@ -56,10 +106,16 @@ const Dashboard = () => {
           />
           <MetricCard
             title="Predictions Made"
-            value="1,247"
-            subtitle="This month"
+            value={
+              loading
+                ? "Loading..."
+                : stats
+                ? stats.predictions_made.toLocaleString()
+                : "N/A"
+            }
+            subtitle="Total dataset records"
             icon={BarChart3}
-            trend="up"
+            trend={stats ? "up" : "neutral"}
             variant="default"
           />
         </div>

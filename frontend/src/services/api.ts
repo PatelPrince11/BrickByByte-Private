@@ -1,7 +1,7 @@
 import axios from "axios";
 
-// Backend API configuration
-const API_BASE_URL = "http://127.0.0.1:8000";
+// Backend API configuration - Use environment variable or fallback to localhost
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 export interface HouseFeatures {
   longitude: number;
@@ -50,10 +50,15 @@ export interface ModelPerformance {
   average_accuracy: number;
 }
 
+// FIX #3: Use correct endpoint /stats/model_performance and use api client
 export const getModelPerformance = async (): Promise<ModelPerformance> => {
-  const res = await fetch("/api/model_performance");
-  if (!res.ok) throw new Error("Failed to fetch model performance");
-  return res.json();
+  try {
+    const response = await api.get("/stats/model_performance");
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+    throw error;
+  }
 };
 
 export interface MapProperty {
@@ -66,17 +71,16 @@ export interface MapProperty {
   housing_age: number;
 }
 
-// Fetch map properties with optional limit
+// FIX #2: Use api client instead of direct axios.get
 export const getMapProperties = async (limit?: number): Promise<MapProperty[]> => {
   try {
-    const url = "/map/properties"; // match backend
-    const response = await axios.get(url, {
+    const response = await api.get("/map/properties", {
       params: limit ? { limit } : {},
     });
-    return response.data.properties; // extract the array
+    return response.data.properties;
   } catch (error) {
-    console.error("Failed to fetch map properties:", error);
-    return [];
+    // Don't swallow errors - let them bubble up so caller can handle
+    throw error;
   }
 };
 
@@ -102,7 +106,7 @@ const handleApiError = (error: any) => {
   } else if (error.request) {
     // Request made but no response
     console.error("Network Error:", error.request);
-    throw new Error("Cannot connect to backend. Please ensure the server is running at http://127.0.0.1:8000");
+    throw new Error(`Cannot connect to backend at ${API_BASE_URL}. Please ensure the server is running.`);
   } else {
     // Something else happened
     console.error("Error:", error.message);
