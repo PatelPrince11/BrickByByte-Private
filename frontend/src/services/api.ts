@@ -1,7 +1,8 @@
 import axios from "axios";
 
 // Backend API configuration - Use environment variable or fallback to localhost
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 export interface HouseFeatures {
   longitude: number;
@@ -72,7 +73,9 @@ export interface MapProperty {
 }
 
 // FIX #2: Use api client instead of direct axios.get
-export const getMapProperties = async (limit?: number): Promise<MapProperty[]> => {
+export const getMapProperties = async (
+  limit?: number,
+): Promise<MapProperty[]> => {
   try {
     const response = await api.get("/map/properties", {
       params: limit ? { limit } : {},
@@ -91,10 +94,8 @@ export interface MapPropertiesResponse {
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  timeout: 10000, // 10 second timeout
+  headers: { "Content-Type": "application/json" },
+  timeout: 35000, // Cover Render cold start
 });
 
 // Error handler
@@ -106,7 +107,9 @@ const handleApiError = (error: any) => {
   } else if (error.request) {
     // Request made but no response
     console.error("Network Error:", error.request);
-    throw new Error(`Cannot connect to backend at ${API_BASE_URL}. Please ensure the server is running.`);
+    throw new Error(
+      `Cannot connect to backend at ${API_BASE_URL}. Please ensure the server is running.`,
+    );
   } else {
     // Something else happened
     console.error("Error:", error.message);
@@ -115,7 +118,7 @@ const handleApiError = (error: any) => {
 };
 
 export const predictPrice = async (
-  features: HouseFeatures
+  features: HouseFeatures,
 ): Promise<PredictionResponse> => {
   try {
     const response = await api.post("/predict/price", features);
@@ -127,7 +130,7 @@ export const predictPrice = async (
 };
 
 export const predictRent = async (
-  features: HouseFeatures
+  features: HouseFeatures,
 ): Promise<PredictionResponse> => {
   try {
     const response = await api.post("/predict/rent", features);
@@ -139,7 +142,7 @@ export const predictRent = async (
 };
 
 export const predictROI = async (
-  features: HouseFeatures
+  features: HouseFeatures,
 ): Promise<PredictionResponse> => {
   try {
     const response = await api.post("/predict/roi", features);
@@ -151,7 +154,7 @@ export const predictROI = async (
 };
 
 export const predictNeighborhood = async (
-  features: HouseFeatures
+  features: HouseFeatures,
 ): Promise<NeighborhoodResponse> => {
   try {
     const response = await api.post("/predict/neighborhood", features);
@@ -163,7 +166,7 @@ export const predictNeighborhood = async (
 };
 
 export const predictSellSpeed = async (
-  features: HouseFeatures
+  features: HouseFeatures,
 ): Promise<SellSpeedResponse> => {
   try {
     const response = await api.post("/predict/sell_speed", features);
@@ -175,11 +178,11 @@ export const predictSellSpeed = async (
 };
 
 export const getFeatureImportance = async (
-  modelType: "price" | "rent" | "roi"
+  modelType: "price" | "rent" | "roi",
 ): Promise<FeatureImportance[]> => {
   try {
     const response = await api.get(
-      `/predict/feature_importance?model=${modelType}`
+      `/predict/feature_importance?model=${modelType}`,
     );
     return response.data;
   } catch (error) {

@@ -30,7 +30,21 @@ const Insights = () => {
       const data = await getModelPerformance();
       setModelPerf(data);
     } catch (error) {
-      console.error("Failed to load model performance:", error);
+      // Backend may be waking up — retry once after 5 seconds
+      console.warn("Model performance failed, retrying in 5s...");
+      setTimeout(async () => {
+        try {
+          const data = await getModelPerformance();
+          setModelPerf(data);
+        } catch (retryError) {
+          console.error("Failed to load model performance:", retryError);
+          toast({
+            title: "Backend Waking Up",
+            description: "Server is starting up, please wait 30 seconds and refresh.",
+            variant: "destructive",
+          });
+        }
+      }, 5000);
     }
   };
 
