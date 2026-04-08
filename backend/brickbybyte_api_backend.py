@@ -164,26 +164,65 @@ def get_dashboard_stats():
 
 @app.get("/stats/model_performance")
 def get_model_performance():
-    """Get model performance metrics"""
+    """Get real model performance metrics calculated from dataset"""
     try:
-        # Load the dataset for calculating R² scores
+        from sklearn.metrics import r2_score, accuracy_score
+
         data_path = os.path.join(script_dir, "data/augmented_housing.csv")
         df = pd.read_csv(data_path)
-        
-        from sklearn.metrics import r2_score
-        
-        # Calculate R² for each model (approximate from full dataset)
-        # In production, you'd load these from saved evaluation metrics
-        
+
+        # Feature engineering to match training pipeline
+        df['rooms_per_household'] = df['total_rooms'] / df['households']
+        df['bedrooms_per_room'] = df['total_bedrooms'] / df['total_rooms']
+        df['population_per_household'] = df['population'] / df['households']
+
+        # One-hot encode ocean_proximity
+        df = pd.get_dummies(df, columns=['ocean_proximity'])
+
+        # --- Regression models ---
+        def calc_r2(model, scaler, feature_cols, target_col):
+            available = [c for c in feature_cols if c in df.columns]
+            X = df[available].fillna(0)
+            missing = [c for c in feature_cols if c not in df.columns]
+            for c in missing:
+                X[c] = 0
+            X = X[feature_cols]
+            X_scaled = scaler.transform(X)
+            y_true = df[target_col].values
+            y_pred = model.predict(X_scaled)
+            return float(round(r2_score(y_true, y_pred), 4))
+
+        price_r2 = calc_r2(price_model, price_scaler, price_features, 'median_house_value')
+        rent_r2 = calc_r2(rent_model, rent_scaler, rent_features, 'estimated_rent')
+        roi_r2 = calc_r2(roi_model, roi_scaler, roi_features, 'roi')
+
+        # --- Classification models ---
+        def calc_accuracy(model, feature_cols, target_col):
+            available = [c for c in feature_cols if c in df.columns]
+            X = df[available].fillna(0)
+            missing = [c for c in feature_cols if c not in df.columns]
+            for c in missing:
+                X[c] = 0
+            X = X[feature_cols]
+            y_true = df[target_col].values
+            y_pred = model.predict(X)
+            return float(round(accuracy_score(y_true, y_pred), 4))
+
+        neighborhood_acc = calc_accuracy(neighborhood_model, neighborhood_features, 'neighborhood_investment')
+        sell_speed_acc = calc_accuracy(sell_speed_model, sell_speed_features, 'sell_speed')
+
+        average = round((price_r2 + rent_r2 + roi_r2 + neighborhood_acc + sell_speed_acc) / 5, 4)
+
         return {
-            "price_r2": 0.82,  # These would be loaded from model evaluation
-            "rent_r2": 0.79,
-            "roi_r2": 0.76,
-            "neighborhood_accuracy": 0.94,
-            "sell_speed_accuracy": 0.88,
-            "average_accuracy": 0.84
+            "price_r2": price_r2,
+            "rent_r2": rent_r2,
+            "roi_r2": roi_r2,
+            "neighborhood_accuracy": neighborhood_acc,
+            "sell_speed_accuracy": sell_speed_acc,
+            "average_accuracy": average
         }
     except Exception as e:
+        logger.error(f"Model performance calculation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/map/properties")
