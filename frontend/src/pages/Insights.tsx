@@ -57,7 +57,8 @@ const Insights = () => {
   const [features, setFeatures] = useState<FeatureImportance[]>([]);
   const [loading, setLoading] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
-  const [modelPerf, setModelPerf] = useState(FALLBACK_MODEL_PERF);
+  // null = still loading, never show zeros
+  const [modelPerf, setModelPerf] = useState<typeof FALLBACK_MODEL_PERF | null>(null);
 
   useEffect(() => {
     loadModelPerformance();
@@ -95,13 +96,16 @@ const Insights = () => {
   const maxImportance = Math.max(...features.map((f) => f.importance), 0.01);
 
   const getCurrentModelScore = () => {
+    if (!modelPerf) return null;
     switch (modelType) {
       case "price": return (modelPerf.price_r2 * 100).toFixed(1);
       case "rent": return (modelPerf.rent_r2 * 100).toFixed(1);
       case "roi": return (modelPerf.roi_r2 * 100).toFixed(1);
-      default: return "0";
+      default: return null;
     }
   };
+
+  const modelScore = getCurrentModelScore();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -161,9 +165,7 @@ const Insights = () => {
                   <div className="h-3 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full gradient-primary rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(feature.importance / maxImportance) * 100}%`,
-                      }}
+                      style={{ width: `${(feature.importance / maxImportance) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -183,9 +185,11 @@ const Insights = () => {
                 <h3 className="font-bold mb-2">
                   {modelType.charAt(0).toUpperCase() + modelType.slice(1)} Model R²
                 </h3>
-                <p className="text-3xl font-bold text-primary mb-2">
-                  {getCurrentModelScore()}%
-                </p>
+                {modelScore === null ? (
+                  <div className="h-9 w-24 bg-muted animate-pulse rounded mb-2" />
+                ) : (
+                  <p className="text-3xl font-bold text-primary mb-2">{modelScore}%</p>
+                )}
                 <p className="text-sm text-muted-foreground">Current model performance</p>
               </div>
             </div>
@@ -237,7 +241,8 @@ const Insights = () => {
         <Card className="p-6 gradient-card border border-accent/30">
           <h3 className="text-lg font-bold mb-2 text-accent">Model Accuracy</h3>
           <p className="text-sm text-muted-foreground">
-            Our XGBoost models achieve {(modelPerf.average_accuracy * 100).toFixed(1)}% average R²
+            Our XGBoost models achieve{" "}
+            {modelPerf ? (modelPerf.average_accuracy * 100).toFixed(1) : "—"}% average R²
             score across all prediction tasks.
           </p>
         </Card>
