@@ -155,3 +155,5 @@ Open: http://localhost:5173
 - **Derived targets** — `monthly_rent` and `roi` are engineered from the dataset, not ground-truth observed values.
 - **No held-out test set persisted** — Model performance metrics are computed on the full training dataset, which overstates true generalization performance.
 - **Static map sample** — Map always shows the same 100 properties (fixed `random_state=42`), not a live data feed.
+- **Model performance metrics computed on held-out test set (20%)** — Price R²: 0.85, Rent R²: 0.51, ROI R²: 0.44, Neighborhood accuracy: 77%, Sell speed accuracy: 69%
+- **Class imbalance in classifiers** — "High" neighborhood investment has only 27 samples vs 14,038 "Low"; model never predicts "High" in practice
