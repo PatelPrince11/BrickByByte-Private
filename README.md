@@ -4,7 +4,7 @@
 
 ML-powered real estate intelligence platform. The platform predicts property sale prices, rental estimates, ROI from renovations, neighborhood investment scores, and expected sell speed from housing characteristics using XGBoost and scikit-learn. It also visualizes neighborhood clusters on a map to help users identify high-potential areas.
 
-**Live demo:** https://brick-by-byte-private.vercel.app
+**Live demo:** https://brickbybyte.vercel.app/
 
 ---
 
