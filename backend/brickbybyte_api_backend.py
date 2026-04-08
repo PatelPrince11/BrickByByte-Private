@@ -145,7 +145,7 @@ def get_dashboard_stats():
         
         # Calculate statistics
         avg_property_value = float(df['median_house_value'].mean())
-        avg_roi = float(df['roi'].mean() * 100)  # Convert to percentage
+        avg_roi = float(df['roi'].mean())  # Convert to percentage
         
         # Count high investment neighborhoods
         high_investment_count = int((df['neighborhood_investment'] == 'High').sum())

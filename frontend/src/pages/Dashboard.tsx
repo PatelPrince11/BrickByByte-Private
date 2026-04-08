@@ -6,9 +6,9 @@ import { getDashboardStats, type DashboardStats } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 
 const FALLBACK_STATS: DashboardStats = {
-  avg_property_value: 342500,
-  avg_roi_potential: 18.4,
-  high_investment_areas: 47,
+  avg_property_value: 206855.82,
+  avg_roi_potential: 8.64,
+  high_investment_areas: 27,
   predictions_made: 20640,
 };
 
