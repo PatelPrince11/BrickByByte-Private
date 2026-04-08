@@ -1,29 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, TrendingUp, Clock, Star } from "lucide-react";
-import { predictNeighborhood, predictSellSpeed } from "@/services/api";
+import { MapPin, TrendingUp, Clock, Star, FlaskConical } from "lucide-react";
+import { predictNeighborhood, predictSellSpeed, checkBackendHealth } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+
+const FALLBACK_RESULTS = {
+  neighborhoodScore: { classification: "Medium", score: 0.74 },
+  sellSpeed: { classification: "Moderate" },
+};
+
+const DEFAULT_FORM = {
+  longitude: "-122.23",
+  latitude: "37.88",
+  housing_median_age: "35",
+  total_rooms: "2000",
+  total_bedrooms: "400",
+  population: "1500",
+  households: "500",
+  median_income: "3.5",
+  ocean_proximity: "NEAR BAY",
+};
 
 const NeighborhoodInsights = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [neighborhoodScore, setNeighborhoodScore] = useState<{ classification: string; score: number } | null>(null);
   const [sellSpeed, setSellSpeed] = useState<{ classification: string } | null>(null);
-  const [formData, setFormData] = useState({
-    longitude: "",
-    latitude: "",
-    housing_median_age: "",
-    total_rooms: "",
-    total_bedrooms: "",
-    population: "",
-    households: "",
-    median_income: "",
-    ocean_proximity: "",
-  });
+  const [isSample, setIsSample] = useState(false);
+  const [formData, setFormData] = useState(DEFAULT_FORM);
+
+  useEffect(() => {
+    const init = async () => {
+      const healthy = await checkBackendHealth();
+      if (!healthy) {
+        setNeighborhoodScore(FALLBACK_RESULTS.neighborhoodScore);
+        setSellSpeed(FALLBACK_RESULTS.sellSpeed);
+        setIsSample(true);
+      }
+    };
+    init();
+  }, []);
 
   const handleAnalyze = async () => {
     setLoading(true);
@@ -42,22 +62,20 @@ const NeighborhoodInsights = () => {
 
       const [neighborhood, speed] = await Promise.all([
         predictNeighborhood(data),
-        predictSellSpeed(data)
+        predictSellSpeed(data),
       ]);
 
       setNeighborhoodScore(neighborhood);
       setSellSpeed(speed);
-      
+      setIsSample(false);
       toast({
         title: "Analysis Complete",
         description: "Neighborhood insights have been generated.",
       });
     } catch (error) {
-      toast({
-        title: "Analysis Failed",
-        description: "Please check your inputs and try again.",
-        variant: "destructive",
-      });
+      setNeighborhoodScore(FALLBACK_RESULTS.neighborhoodScore);
+      setSellSpeed(FALLBACK_RESULTS.sellSpeed);
+      setIsSample(true);
     } finally {
       setLoading(false);
     }
@@ -65,34 +83,26 @@ const NeighborhoodInsights = () => {
 
   const getScoreColor = (score: string) => {
     switch (score.toLowerCase()) {
-      case "high":
-        return { bg: "bg-success/10", text: "text-success", border: "border-success/30" };
-      case "medium":
-        return { bg: "bg-warning/10", text: "text-warning", border: "border-warning/30" };
-      case "low":
-        return { bg: "bg-destructive/10", text: "text-destructive", border: "border-destructive/30" };
-      default:
-        return { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" };
+      case "high":   return { bg: "bg-success/10", text: "text-success", border: "border-success/30" };
+      case "medium": return { bg: "bg-warning/10", text: "text-warning", border: "border-warning/30" };
+      case "low":    return { bg: "bg-destructive/10", text: "text-destructive", border: "border-destructive/30" };
+      default:       return { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" };
     }
   };
 
   const getSpeedColor = (speed: string) => {
     switch (speed.toLowerCase()) {
-      case "fast":
-        return { bg: "bg-success/10", text: "text-success", border: "border-success/30" };
-      case "medium":
-        return { bg: "bg-warning/10", text: "text-warning", border: "border-warning/30" };
-      case "slow":
-        return { bg: "bg-destructive/10", text: "text-destructive", border: "border-destructive/30" };
-      default:
-        return { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" };
+      case "fast":     return { bg: "bg-success/10", text: "text-success", border: "border-success/30" };
+      case "moderate": return { bg: "bg-warning/10", text: "text-warning", border: "border-warning/30" };
+      case "medium":   return { bg: "bg-warning/10", text: "text-warning", border: "border-warning/30" };
+      case "slow":     return { bg: "bg-destructive/10", text: "text-destructive", border: "border-destructive/30" };
+      default:         return { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" };
     }
   };
 
   return (
     <div className="min-h-screen bg-background pt-20 pb-16 px-4">
       <div className="container mx-auto max-w-6xl">
-        {/* Header */}
         <div className="mb-12 text-center">
           <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-4">
             Neighborhood Insights
@@ -118,59 +128,41 @@ const NeighborhoodInsights = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="longitude">Longitude</Label>
-                  <Input
-                    id="longitude"
-                    type="number"
-                    step="0.000001"
+                  <Input id="longitude" type="number" step="0.000001"
                     value={formData.longitude}
                     onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                    placeholder="-122.23"
                   />
                 </div>
                 <div>
                   <Label htmlFor="latitude">Latitude</Label>
-                  <Input
-                    id="latitude"
-                    type="number"
-                    step="0.000001"
+                  <Input id="latitude" type="number" step="0.000001"
                     value={formData.latitude}
                     onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                    placeholder="37.88"
                   />
                 </div>
               </div>
 
               <div>
                 <Label htmlFor="median_income">Median Income (in $10,000s)</Label>
-                <Input
-                  id="median_income"
-                  type="number"
-                  step="0.01"
+                <Input id="median_income" type="number" step="0.01"
                   value={formData.median_income}
                   onChange={(e) => setFormData({ ...formData, median_income: e.target.value })}
-                  placeholder="3.5"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="total_rooms">Total Rooms</Label>
-                  <Input
-                    id="total_rooms"
-                    type="number"
+                  <Input id="total_rooms" type="number"
                     value={formData.total_rooms}
                     onChange={(e) => setFormData({ ...formData, total_rooms: e.target.value })}
-                    placeholder="2000"
                   />
                 </div>
                 <div>
                   <Label htmlFor="total_bedrooms">Total Bedrooms</Label>
-                  <Input
-                    id="total_bedrooms"
-                    type="number"
+                  <Input id="total_bedrooms" type="number"
                     value={formData.total_bedrooms}
                     onChange={(e) => setFormData({ ...formData, total_bedrooms: e.target.value })}
-                    placeholder="400"
                   />
                 </div>
               </div>
@@ -178,34 +170,25 @@ const NeighborhoodInsights = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="population">Population</Label>
-                  <Input
-                    id="population"
-                    type="number"
+                  <Input id="population" type="number"
                     value={formData.population}
                     onChange={(e) => setFormData({ ...formData, population: e.target.value })}
-                    placeholder="1500"
                   />
                 </div>
                 <div>
                   <Label htmlFor="households">Households</Label>
-                  <Input
-                    id="households"
-                    type="number"
+                  <Input id="households" type="number"
                     value={formData.households}
                     onChange={(e) => setFormData({ ...formData, households: e.target.value })}
-                    placeholder="500"
                   />
                 </div>
               </div>
 
               <div>
                 <Label htmlFor="housing_median_age">Housing Median Age</Label>
-                <Input
-                  id="housing_median_age"
-                  type="number"
+                <Input id="housing_median_age" type="number"
                   value={formData.housing_median_age}
                   onChange={(e) => setFormData({ ...formData, housing_median_age: e.target.value })}
-                  placeholder="35"
                 />
               </div>
 
@@ -225,12 +208,7 @@ const NeighborhoodInsights = () => {
                 </Select>
               </div>
 
-              <Button 
-                onClick={handleAnalyze} 
-                disabled={loading}
-                className="w-full"
-                size="lg"
-              >
+              <Button onClick={handleAnalyze} disabled={loading} className="w-full" size="lg">
                 {loading ? "Analyzing..." : "Analyze Neighborhood"}
               </Button>
             </CardContent>
@@ -238,6 +216,15 @@ const NeighborhoodInsights = () => {
 
           {/* Results */}
           <div className="space-y-6">
+            {isSample && (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                <FlaskConical className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  <strong>Demo mode</strong> — backend is offline. Values shown are illustrative only.
+                </span>
+              </div>
+            )}
+
             <Card className={`shadow-card border-2 ${neighborhoodScore ? getScoreColor(neighborhoodScore.classification).border : "border-border"}`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -259,9 +246,7 @@ const NeighborhoodInsights = () => {
                 ) : (
                   <div className="text-center py-8">
                     <Star className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      Enter location details to see investment score
-                    </p>
+                    <p className="text-muted-foreground">Enter location details to see investment score</p>
                   </div>
                 )}
               </CardContent>
@@ -288,9 +273,7 @@ const NeighborhoodInsights = () => {
                 ) : (
                   <div className="text-center py-8">
                     <Clock className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      Analyze to see sell speed prediction
-                    </p>
+                    <p className="text-muted-foreground">Analyze to see sell speed prediction</p>
                   </div>
                 )}
               </CardContent>

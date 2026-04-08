@@ -20,6 +20,7 @@ import {
   MapPin,
   Clock,
   Loader2,
+  FlaskConical,
 } from "lucide-react";
 import type { HouseFeatures } from "@/services/api";
 import {
@@ -31,6 +32,29 @@ import {
   checkBackendHealth,
 } from "@/services/api";
 
+const DEFAULT_INPUTS: HouseFeatures = {
+  longitude: -122,
+  latitude: 37.75,
+  housing_median_age: 25,
+  total_rooms: 8,
+  total_bedrooms: 3,
+  population: 1500,
+  households: 500,
+  median_income: 4.5,
+  ocean_proximity: "INLAND",
+  renovation_budget: 50000,
+};
+
+const FALLBACK_RESULTS = {
+  price: 342500,
+  rent: 1850,
+  roi: 18.4,
+  neighborhood: "Medium",
+  neighborhoodScore: 0.74,
+  sellSpeed: "Moderate",
+  isSample: true,
+};
+
 const Predict = () => {
   const {
     register,
@@ -38,27 +62,26 @@ const Predict = () => {
     setValue,
     watch,
     formState: { errors },
-  } = useForm<HouseFeatures>();
+  } = useForm<HouseFeatures>({ defaultValues: DEFAULT_INPUTS });
+
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
-
-  useEffect(() => {
-    const checkHealth = async () => {
-      const isHealthy = await checkBackendHealth();
-      if (!isHealthy) {
-        toast({
-          title: "Backend Not Connected",
-          description:
-            "Please ensure the backend server is running on http://127.0.0.1:8000",
-          variant: "destructive",
-        });
-      }
-    };
-    checkHealth();
-  }, [toast]);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
 
   const oceanProximity = watch("ocean_proximity");
+
+  // On mount: check backend and immediately show fallback if offline
+  useEffect(() => {
+    const init = async () => {
+      const healthy = await checkBackendHealth();
+      setBackendOnline(healthy);
+      if (!healthy) {
+        setResults(FALLBACK_RESULTS);
+      }
+    };
+    init();
+  }, []);
 
   const onSubmit = async (data: HouseFeatures) => {
     setLoading(true);
@@ -80,6 +103,7 @@ const Predict = () => {
         neighborhood: neighborhood.classification,
         neighborhoodScore: neighborhood.score,
         sellSpeed: sellSpeed.classification,
+        isSample: false,
       });
 
       toast({
@@ -87,13 +111,8 @@ const Predict = () => {
         description: "All metrics have been successfully calculated.",
       });
     } catch (error) {
-      toast({
-        title: "Prediction Failed",
-        description:
-          "Unable to fetch predictions. Please check your backend connection.",
-        variant: "destructive",
-      });
       console.error("Prediction error:", error);
+      setResults(FALLBACK_RESULTS);
     } finally {
       setLoading(false);
     }
@@ -122,7 +141,6 @@ const Predict = () => {
                   id="longitude"
                   type="number"
                   step="any"
-                  placeholder="-122.45"
                   className={errors.longitude ? "border-destructive" : ""}
                   {...register("longitude", {
                     required: "Required",
@@ -132,9 +150,7 @@ const Predict = () => {
                   })}
                 />
                 {errors.longitude && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.longitude.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.longitude.message}</p>
                 )}
               </div>
               <div>
@@ -143,7 +159,6 @@ const Predict = () => {
                   id="latitude"
                   type="number"
                   step="any"
-                  placeholder="37.75"
                   className={errors.latitude ? "border-destructive" : ""}
                   {...register("latitude", {
                     required: "Required",
@@ -153,9 +168,7 @@ const Predict = () => {
                   })}
                 />
                 {errors.latitude && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.latitude.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.latitude.message}</p>
                 )}
               </div>
             </div>
@@ -167,7 +180,6 @@ const Predict = () => {
                 <Input
                   id="total_rooms"
                   type="number"
-                  placeholder="8"
                   className={errors.total_rooms ? "border-destructive" : ""}
                   {...register("total_rooms", {
                     required: "Required",
@@ -176,9 +188,7 @@ const Predict = () => {
                   })}
                 />
                 {errors.total_rooms && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.total_rooms.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.total_rooms.message}</p>
                 )}
               </div>
               <div>
@@ -186,7 +196,6 @@ const Predict = () => {
                 <Input
                   id="total_bedrooms"
                   type="number"
-                  placeholder="3"
                   className={errors.total_bedrooms ? "border-destructive" : ""}
                   {...register("total_bedrooms", {
                     required: "Required",
@@ -195,9 +204,7 @@ const Predict = () => {
                   })}
                 />
                 {errors.total_bedrooms && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.total_bedrooms.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.total_bedrooms.message}</p>
                 )}
               </div>
             </div>
@@ -209,7 +216,6 @@ const Predict = () => {
                 <Input
                   id="population"
                   type="number"
-                  placeholder="1500"
                   className={errors.population ? "border-destructive" : ""}
                   {...register("population", {
                     required: "Required",
@@ -218,9 +224,7 @@ const Predict = () => {
                   })}
                 />
                 {errors.population && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.population.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.population.message}</p>
                 )}
               </div>
               <div>
@@ -228,7 +232,6 @@ const Predict = () => {
                 <Input
                   id="households"
                   type="number"
-                  placeholder="500"
                   className={errors.households ? "border-destructive" : ""}
                   {...register("households", {
                     required: "Required",
@@ -237,9 +240,7 @@ const Predict = () => {
                   })}
                 />
                 {errors.households && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.households.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.households.message}</p>
                 )}
               </div>
             </div>
@@ -251,10 +252,7 @@ const Predict = () => {
                 <Input
                   id="housing_median_age"
                   type="number"
-                  placeholder="25"
-                  className={
-                    errors.housing_median_age ? "border-destructive" : ""
-                  }
+                  className={errors.housing_median_age ? "border-destructive" : ""}
                   {...register("housing_median_age", {
                     required: "Required",
                     valueAsNumber: true,
@@ -263,23 +261,18 @@ const Predict = () => {
                   })}
                 />
                 {errors.housing_median_age && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.housing_median_age.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.housing_median_age.message}</p>
                 )}
               </div>
               <div>
                 <Label htmlFor="median_income">
                   Median Income{" "}
-                  <span className="text-xs text-muted-foreground">
-                    (scaled 0.5–15)
-                  </span>
+                  <span className="text-xs text-muted-foreground">(scaled 0.5–15)</span>
                 </Label>
                 <Input
                   id="median_income"
                   type="number"
                   step="any"
-                  placeholder="4.5"
                   className={errors.median_income ? "border-destructive" : ""}
                   {...register("median_income", {
                     required: "Required",
@@ -289,9 +282,7 @@ const Predict = () => {
                   })}
                 />
                 {errors.median_income && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.median_income.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.median_income.message}</p>
                 )}
               </div>
             </div>
@@ -305,18 +296,12 @@ const Predict = () => {
                 }
                 value={oceanProximity}
               >
-                <SelectTrigger
-                  className={
-                    errors.ocean_proximity ? "border-destructive" : ""
-                  }
-                >
+                <SelectTrigger className={errors.ocean_proximity ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select proximity to ocean" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NEAR BAY">Near Bay</SelectItem>
-                  <SelectItem value="<1H OCEAN">
-                    Less than 1 hour to ocean
-                  </SelectItem>
+                  <SelectItem value="<1H OCEAN">Less than 1 hour to ocean</SelectItem>
                   <SelectItem value="INLAND">Inland</SelectItem>
                   <SelectItem value="NEAR OCEAN">Near Ocean</SelectItem>
                   <SelectItem value="ISLAND">Island</SelectItem>
@@ -327,9 +312,7 @@ const Predict = () => {
                 {...register("ocean_proximity", { required: "Select an option" })}
               />
               {errors.ocean_proximity && (
-                <p className="text-xs text-destructive mt-1">
-                  {errors.ocean_proximity.message}
-                </p>
+                <p className="text-xs text-destructive mt-1">{errors.ocean_proximity.message}</p>
               )}
             </div>
 
@@ -342,7 +325,6 @@ const Predict = () => {
               <Input
                 id="renovation_budget"
                 type="number"
-                placeholder="50000"
                 className={errors.renovation_budget ? "border-destructive" : ""}
                 {...register("renovation_budget", {
                   setValueAs: (v) =>
@@ -351,9 +333,7 @@ const Predict = () => {
                 })}
               />
               {errors.renovation_budget && (
-                <p className="text-xs text-destructive mt-1">
-                  {errors.renovation_budget.message}
-                </p>
+                <p className="text-xs text-destructive mt-1">{errors.renovation_budget.message}</p>
               )}
             </div>
 
@@ -376,15 +356,23 @@ const Predict = () => {
 
         {/* Results */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold mb-6 animate-fade-in">
-            Prediction Results
-          </h2>
+          <h2 className="text-2xl font-bold mb-2 animate-fade-in">Prediction Results</h2>
+
+          {/* Sample data disclaimer */}
+          {results?.isSample && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              <FlaskConical className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                <strong>Sample prediction</strong> — backend is offline. Values shown are
+                illustrative only and not based on your inputs.
+              </span>
+            </div>
+          )}
 
           {!results && !loading && (
             <Card className="p-12 gradient-card border border-border text-center">
               <p className="text-muted-foreground">
-                Enter property details and click "Get Predictions" to see
-                results
+                Enter property details and click "Get Predictions" to see results
               </p>
             </Card>
           )}
