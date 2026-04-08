@@ -6,23 +6,29 @@ import joblib
 import numpy as np
 import pandas as pd
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ---------------- Setup ---------------- #
 app = FastAPI(title="BrickByByte Housing API", version="1.0")
 
 # CORS Configuration - Allow frontend to connect
+import os
+
+# CORS Configuration - Allow frontend to connect
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8080",  # Vite dev server
-        "http://localhost:5173",  # Alternative Vite port
-        "http://localhost:3000",  # React alternative
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 # ---------------- Load models and feature columns ---------------- #
