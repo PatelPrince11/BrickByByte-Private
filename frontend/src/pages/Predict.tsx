@@ -227,7 +227,9 @@ const Predict = () => {
                 id="renovation_budget"
                 type="number"
                 placeholder="50000"
-                {...register("renovation_budget", { valueAsNumber: true })}
+                {...register("renovation_budget", {
+                  setValueAs: (v) => v === "" || v === null || isNaN(Number(v)) ? 0 : Number(v),
+                })}
               />
             </div>
 
